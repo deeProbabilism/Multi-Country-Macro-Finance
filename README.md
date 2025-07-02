@@ -5,5 +5,5 @@ This repository contains code and experiments for solving high-dimensional conti
 ## Features
 
 - Implementation of probabilistic deep learning methods
-- Examples in macro-finance contexts
-- Simulation and evaluation tools
+- Examples in macro-finance context
+
