@@ -134,44 +134,61 @@ class DatasetGenerator:
         return np.concatenate([omega, zeta, boundary_country], axis=1)
 
     def generate_boundary_samples(self):
-        """向量化版本"""
-        # 一次性生成所有omega样本
-        omega = np.random.uniform(0.2, 0.8, size=(self.J * self.N_boundary_per_country, self.J))
+    """Vectorized boundary sample generator."""
+    # ω samples: uniform draw from 0.2 to 0.8
+    omega = np.random.uniform(
+        0.2, 0.8,
+        size=(self.J * self.N_boundary_per_country, self.J)
+    )
 
-        # 创建索引矩阵，用于设置对角线位置为underline_omega
-        country_indices = np.repeat(np.arange(self.J), self.N_boundary_per_country) #[0,0,1,1,2,2,3,3.......]
-        sample_indices = np.arange(self.J * self.N_boundary_per_country)#[0,1,2,3,4,..............]
-        omega[sample_indices, country_indices] = self.underline_omega
+    # Build indices: each country repeated for its boundary samples
+    country_indices = np.repeat(
+        np.arange(self.J),
+        self.N_boundary_per_country
+    )
+    sample_indices = np.arange(self.J * self.N_boundary_per_country)
+    # Set diagonal element (country weight) to underline_omega
+    omega[sample_indices, country_indices] = self.underline_omega
 
-        # 一次性生成所有zeta样本
-        alpha = np.ones(self.J) * 50
-        zeta_full = np.random.dirichlet(alpha, size=self.J * self.N_boundary_per_country)
-        zeta = zeta_full[:, :self.J - 1]
+    # ζ samples: Dirichlet with concentration α = 50 for each country
+    alpha = np.ones(self.J) * 50
+    zeta_full = np.random.dirichlet(
+        alpha,
+        size=self.J * self.N_boundary_per_country
+    )
+    # Keep only first J-1 components
+    zeta = zeta_full[:, : self.J - 1]
 
-        # 创建边界国家标识
-        boundary_country = country_indices.reshape(-1, 1)
+    # Boundary country flag column
+    boundary_country = country_indices.reshape(-1, 1)
 
-        # 拼接所有特征
-        Omega_boundary = np.concatenate([omega, zeta, boundary_country], axis=1)
+    # Combine features into Omega_boundary
+    Omega_boundary = np.concatenate(
+        [omega, zeta, boundary_country],
+        axis=1
+    )
 
-        return Omega_boundary
+    return Omega_boundary
+
     # Generate Brownian shocks
     def generate_shocks(self):
         z = np.random.normal(0, np.sqrt(self.delta_t), size=(self.N_total, self.J + 1, self.J))
         z[:, 0, :] = 0  # Set the first row to zero
         return z
 
-    def precompute_inverse(self, z):
+     def precompute_inverse(self, z):
+        """Precompute matrix inverses for [1, z_scaled] blocks."""
         N = z.shape[0]
-        # 常数项
+        # Constant one column: shape (N, J+1, 1)
         ones = np.ones((N, self.J + 1, 1), dtype=np.float64)
-        # 把 z 按照全局 scale 放大
-        z_scaled = z * scale  # (N, J) → (N, J)
-        # 拼成 [1, z_scaled]
-        matrix = np.concatenate([ones, z_scaled], axis=2)  # (N, J+1, J+1)
-        # 求逆
+        # Scale z for numerical stability
+        z_scaled = z * scale
+        # Concatenate ones and scaled z along last axis
+        matrix = np.concatenate([ones, z_scaled], axis=2)
+        # Invert each block
         inv_matrix = np.linalg.inv(matrix)
         return inv_matrix
+
 
     def create_dataset(self):
         Omega_interior = self.sample_interior_points()
@@ -361,19 +378,19 @@ def compute_bsde_loss(Omega_batch, z_batch, inv_matrix_batch, is_interior_batch,
 
     q_diff = q_all - q_batch_expanded * mu_q_batch_expanded * delta_t  # [batch_size, J+1, J]
 
-    # 1) 同样计算 lhs
+   
     lhs = tf.einsum('bij,bjk->bik', inv_matrix_batch, q_diff)  # [batch_size, J+1, J]
 
-    # 2) 常数项 q̂
+    
     hat_q = lhs[:, 0:1, :]  # [batch_size, 1, J]
 
-    # 3) 对应于 z*scale 回归出来的斜率
+    
     beta_scaled = lhs[:, 1:, :]  # [batch_size, J, J]
 
-    # 4) 还原到原始 z 单位：乘回 scale，再除以 hat_q
+    
     hat_sigma_q_im = scale * beta_scaled / (hat_q + 1e-6)  # [batch_size, J, J]
 
-    # 5) 转置成 [batch, J, J]
+    
     hat_sigma_q = tf.transpose(hat_sigma_q_im, perm=[0, 2, 1])
 
 
@@ -478,13 +495,11 @@ def train_bsde_model(epochs_list, learning_rate_list, dataset, net):
     print("Main training completed.", flush=True)
 
 if RUN_PRETRAIN:
-    # 1.1 生成预训练样本
     omega_init = np.random.uniform(0.01, 10.0, size=(N_init, J))
     omega_init = np.maximum(omega_init, 0.01)
     zeta_init  = np.random.uniform(0.01, 0.9999, size=(N_init, J - 1))
     zeta_init  = np.clip(zeta_init, 0.01, 0.9999)
 
-    # 1.2 训练
     initialize = Initialize_BSDE_Solver(omega_init, zeta_init)
     initialize.train(
         epochs_list         = PRETRAIN_EPOCHS,
@@ -492,13 +507,13 @@ if RUN_PRETRAIN:
         batch_size          = BATCH_SIZE,
     )
 
-    # 1.3 保存权重
+    
     initialize.model.net.save_weights(CKPT_INIT)
 
-# --- 2 主网络与数据集 ------------------------------------------------------
+
 net = BSDE_Network()
 
-# 若预训练完成过（或你手动放了一份 ckpt），就加载；否则跳过
+
 if RUN_PRETRAIN:
     net.load_weights(CKPT_INIT)
     print("Loaded pre-trained weights.")
