@@ -154,25 +154,39 @@ class DatasetGenerator:
         return np.concatenate([omega, zeta, boundary_country], axis=1)
 
     def generate_boundary_samples(self):
-        """向量化版本"""
-        # 一次性生成所有omega样本
-        omega = np.random.uniform(0.2, 0.8, size=(self.J * self.N_boundary_per_country, self.J))
-
-        # 创建索引矩阵，用于设置对角线位置为underline_omega
-        country_indices = np.repeat(np.arange(self.J), self.N_boundary_per_country)  # [0,0,1,1,2,2,3,3.......]
-        sample_indices = np.arange(self.J * self.N_boundary_per_country)  # [0,1,2,3,4,..............]
+        """Vectorized boundary sample generator."""
+        # ω samples: uniform draw from 0.2 to 0.8
+        omega = np.random.uniform(
+            0.2, 0.8,
+            size=(self.J * self.N_boundary_per_country, self.J)
+        )
+    
+        # Build indices: each country repeated for its boundary samples
+        country_indices = np.repeat(
+            np.arange(self.J),
+            self.N_boundary_per_country
+        )
+        sample_indices = np.arange(self.J * self.N_boundary_per_country)
+        # Set diagonal element (country weight) to underline_omega
         omega[sample_indices, country_indices] = self.underline_omega
-
-        # 一次性生成所有zeta样本
+    
+        # ζ samples: Dirichlet with concentration α = 50 for each country
         alpha = np.ones(self.J) * 50
-        zeta_full = np.random.dirichlet(alpha, size=self.J * self.N_boundary_per_country)
-        zeta = zeta_full[:, :self.J - 1]
-
-        # 创建边界国家标识
+        zeta_full = np.random.dirichlet(
+            alpha,
+            size=self.J * self.N_boundary_per_country
+        )
+        # Keep only first J-1 components
+        zeta = zeta_full[:, : self.J - 1]
+    
+        # Boundary country flag column
         boundary_country = country_indices.reshape(-1, 1)
-
-        # 拼接所有特征
-        Omega_boundary = np.concatenate([omega, zeta, boundary_country], axis=1)
+    
+        # Combine features into Omega_boundary
+        Omega_boundary = np.concatenate(
+            [omega, zeta, boundary_country],
+            axis=1
+        )
 
         return Omega_boundary
 
@@ -265,18 +279,6 @@ def compute_jacobian_and_hessian(Omega, net, compute_hessian=False):
 
 
 def compute_sigma_q(q_grad, omega, zeta, q):
-    """
-    根据雅克比矩阵构造A、b矩阵并求解sigma_q
-
-    Args:
-        q_grad: 雅克比矩阵 [N, J, 2*J]
-        omega: omega张量 [N, J]
-        zeta: zeta张量 [N, J-1]
-        q: q张量 [N, J]
-
-    Returns:
-        sigma_q: sigma_q张量 [N, J, J]
-    """
     N = tf.shape(omega)[0]
     J = tf.shape(omega)[1]
 
@@ -315,21 +317,18 @@ def compute_sigma_q(q_grad, omega, zeta, q):
 
 
 def compute_q_and_sigma_q(Omega, net):
-    """重构后的compute_q_and_sigma_q函数"""
     Omega = tf.convert_to_tensor(Omega, dtype=tf.float64)
     N = tf.shape(Omega)[0]
     J = tf.shape(Omega)[1] // 2
     omega = Omega[:, :J]
     zeta = Omega[:, J:2 * J - 1]
 
-    # 计算xi_tilde和q
+   
     xi_tilde, _ = net(Omega[:, :-1])
     xi, q = compute_xi_q(omega, zeta, xi_tilde, rho, a, psi)
 
-    # 计算雅克比矩阵
     q_grad = compute_jacobian_and_hessian(Omega, net, compute_hessian=False)
 
-    # 计算sigma_q
     sigma_q = compute_sigma_q(q_grad, omega, zeta, q)
 
     return q, sigma_q
@@ -346,17 +345,17 @@ def compute_pde_loss_with_mask(Omega, is_interior):
     zeta_J = 1.0 - zeta_sum
     zeta_full = tf.concat([zeta, zeta_J], axis=1)
 
-    # 计算xi_tilde和q
+    
     xi_tilde, r = net(Omega[:, :-1])
     xi, q = compute_xi_q(omega, zeta, xi_tilde, rho, a, psi)
 
-    # 计算雅克比矩阵和黑塞矩阵
+    
     q_grad, q_hess = compute_jacobian_and_hessian(Omega, net, compute_hessian=True)
 
-    # 计算sigma_q
+   
     sigma_q = compute_sigma_q(q_grad, omega, zeta, q)
 
-    # 计算其他所需变量
+    
     sigma_qK = sigma_q + tf.eye(J, batch_shape=[N], dtype=tf.float64) * sigma
     sigma_H = tf.reduce_sum(zeta_full[:, :, tf.newaxis] * sigma_qK, axis=1)
     mu_qK = -(a * psi + 1) / (psi * q) + 1.0 / psi + (1.0 / omega) * tf.reduce_sum(sigma_qK ** 2, axis=2) + r
