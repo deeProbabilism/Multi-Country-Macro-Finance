@@ -4,6 +4,8 @@ This repository contains code and experiments for solving the multi-country macr
 
 The primary comparison is between the backward Euler scheme based on BSDE and the PDE approach (i.e., PINN).
 
+Yu Jinghai, Geng Bojun, and Wang Xiankang have made contributions at various stages of the probject.
+
 
 
 ## Features
