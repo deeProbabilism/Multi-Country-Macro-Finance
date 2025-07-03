@@ -134,41 +134,41 @@ class DatasetGenerator:
         return np.concatenate([omega, zeta, boundary_country], axis=1)
 
     def generate_boundary_samples(self):
-    """Vectorized boundary sample generator."""
-    # ω samples: uniform draw from 0.2 to 0.8
-    omega = np.random.uniform(
-        0.2, 0.8,
-        size=(self.J * self.N_boundary_per_country, self.J)
-    )
-
-    # Build indices: each country repeated for its boundary samples
-    country_indices = np.repeat(
-        np.arange(self.J),
-        self.N_boundary_per_country
-    )
-    sample_indices = np.arange(self.J * self.N_boundary_per_country)
-    # Set diagonal element (country weight) to underline_omega
-    omega[sample_indices, country_indices] = self.underline_omega
-
-    # ζ samples: Dirichlet with concentration α = 50 for each country
-    alpha = np.ones(self.J) * 50
-    zeta_full = np.random.dirichlet(
-        alpha,
-        size=self.J * self.N_boundary_per_country
-    )
-    # Keep only first J-1 components
-    zeta = zeta_full[:, : self.J - 1]
-
-    # Boundary country flag column
-    boundary_country = country_indices.reshape(-1, 1)
-
-    # Combine features into Omega_boundary
-    Omega_boundary = np.concatenate(
-        [omega, zeta, boundary_country],
-        axis=1
-    )
-
-    return Omega_boundary
+        """Vectorized boundary sample generator."""
+        # ω samples: uniform draw from 0.2 to 0.8
+        omega = np.random.uniform(
+            0.2, 0.8,
+            size=(self.J * self.N_boundary_per_country, self.J)
+        )
+    
+        # Build indices: each country repeated for its boundary samples
+        country_indices = np.repeat(
+            np.arange(self.J),
+            self.N_boundary_per_country
+        )
+        sample_indices = np.arange(self.J * self.N_boundary_per_country)
+        # Set diagonal element (country weight) to underline_omega
+        omega[sample_indices, country_indices] = self.underline_omega
+    
+        # ζ samples: Dirichlet with concentration α = 50 for each country
+        alpha = np.ones(self.J) * 50
+        zeta_full = np.random.dirichlet(
+            alpha,
+            size=self.J * self.N_boundary_per_country
+        )
+        # Keep only first J-1 components
+        zeta = zeta_full[:, : self.J - 1]
+    
+        # Boundary country flag column
+        boundary_country = country_indices.reshape(-1, 1)
+    
+        # Combine features into Omega_boundary
+        Omega_boundary = np.concatenate(
+            [omega, zeta, boundary_country],
+            axis=1
+        )
+    
+        return Omega_boundary
 
     # Generate Brownian shocks
     def generate_shocks(self):
