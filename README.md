@@ -1,6 +1,8 @@
-# A-Probabilistic-Solution-to-High-Dimensional-Continuous-Time-Macro-and-Finance-Models
+# Multi-Country Macro-Finance
 
-This repository contains code and experiments for solving high-dimensional continuous-time macroeconomic and finance models using probabilistic approaches.
+This repository contains code and experiments for solving the multi-country macro-finance example with the deep learning-based BSDE approach. The detailed exposition of the example can be found in Section 3 of the paper titled "The Probabilistic Solution of High-Dimensional Continuous-Time Macro and Finance Models" by Ji Huang.
+
+
 
 ## Features
 
