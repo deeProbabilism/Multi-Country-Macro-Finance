@@ -176,7 +176,7 @@ class DatasetGenerator:
         z[:, 0, :] = 0  # Set the first row to zero
         return z
 
-     def precompute_inverse(self, z):
+    def precompute_inverse(self, z):
         """Precompute matrix inverses for [1, z_scaled] blocks."""
         N = z.shape[0]
         # Constant one column: shape (N, J+1, 1)
